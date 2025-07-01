@@ -2,6 +2,7 @@
 
 namespace BagistoPlus\Visual\Settings;
 
+use BagistoPlus\Visual\Settings\Support\FieldEvaluator;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Str;
 use JsonSerializable;
@@ -27,6 +28,18 @@ abstract class Base implements Arrayable, JsonSerializable
 
     public string $type;
 
+    public bool $isLive = false;
+
+    /**
+     * @var bool|callable
+     */
+    public mixed $isHidden = false;
+
+    /**
+     * @var bool|callable
+     */
+    public mixed $isVisible = true;
+
     public static string $component = 'base-setting';
 
     public function __construct($id, $label)
@@ -44,6 +57,40 @@ abstract class Base implements Arrayable, JsonSerializable
         $instance->type($instance->type ?? Str::snake((new \ReflectionClass(static::class))->getShortName()));
 
         return $instance;
+    }
+
+    public function live(bool $state = true): self
+    {
+        $this->isLive = $state;
+
+        return $this;
+    }
+
+    /**
+     * @param bool|callable $condition
+     */
+    public function hidden(mixed $condition = true): self
+    {
+        $this->isHidden = $condition;
+
+        return $this;
+    }
+
+    /**
+     * @param bool|callable $condition
+     */
+    public function visible(mixed $condition = true): self
+    {
+        $this->isVisible = $condition;
+
+        return $this;
+    }
+
+    public function evaluateWithValues(array $values = []): array
+    {
+        $evaluator = new FieldEvaluator([], $values);
+
+        return $evaluator->evaluateFields([$this], $values)[0];
     }
 
     public function __get($name)
@@ -66,6 +113,18 @@ abstract class Base implements Arrayable, JsonSerializable
         return $this;
     }
 
+    /**
+     * @param bool|callable $condition
+     */
+    protected function evaluateCondition(mixed $condition, ?callable $get = null): bool
+    {
+        if (is_callable($condition)) {
+            return $condition($get);
+        }
+
+        return (bool) $condition;
+    }
+
     public function toArray(): array
     {
         return [
@@ -75,6 +134,9 @@ abstract class Base implements Arrayable, JsonSerializable
             'default' => $this->default,
             'info' => $this->info,
             'component' => static::$component,
+            'live' => $this->isLive,
+            'hidden' => $this->isHidden,
+            'visible' => $this->isVisible,
         ];
     }
 
